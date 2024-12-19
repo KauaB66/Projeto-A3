@@ -1,24 +1,26 @@
+
+
 import java.awt.*;
-import java.util.ArrayList;
+import java.sql.*;
 import javax.swing.*;
 
 public class Interface extends JFrame {
 
-    private ArrayList<Biblioteca> livros;
-    private JTextField autorField, generoField, anoDeLancamentoField, codigoISBNField, quantidadeDeCopiasField, valorField, nomeField, prateleiraField, quantidadeDePaginasField, edicaoField;
+    private JTextField autorField, generoField, anoDeLancamentoField, quantidadeDeCopiasField, valorField, nomeField, prateleiraField, quantidadeDePaginasField, edicaoField, idConsultaField;
     private JTextArea consultaArea;
-    private Biblioteca livroAtual;
+    private Connection connection;
 
     public Interface() {
-        livros = new ArrayList<>();
-
         setTitle("Cadastro de Livros");
         setSize(600, 500);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        // Painel para inserção de dados
         JPanel panelSuperior = new JPanel(new GridLayout(10, 2));
+
+        panelSuperior.add(new JLabel("ID para Consulta:"));
+        idConsultaField = new JTextField();
+        panelSuperior.add(idConsultaField);
 
         panelSuperior.add(new JLabel("Autor:"));
         autorField = new JTextField();
@@ -31,10 +33,6 @@ public class Interface extends JFrame {
         panelSuperior.add(new JLabel("Ano de Lançamento:"));
         anoDeLancamentoField = new JTextField();
         panelSuperior.add(anoDeLancamentoField);
-
-        panelSuperior.add(new JLabel("Código ISBN:"));
-        codigoISBNField = new JTextField();
-        panelSuperior.add(codigoISBNField);
 
         panelSuperior.add(new JLabel("Quantidade de Cópias:"));
         quantidadeDeCopiasField = new JTextField();
@@ -81,89 +79,172 @@ public class Interface extends JFrame {
         consultaArea.setEditable(false);
         add(new JScrollPane(consultaArea), BorderLayout.SOUTH);
 
-
         incluirButton.addActionListener(e -> incluirLivro());
-        consultarButton.addActionListener(e -> consultarLivro());
-        alterarButton.addActionListener(e -> carregarLivroParaAlteracao());
+        consultarButton.addActionListener(e -> consultarLivroPorId());
+        alterarButton.addActionListener(e -> alterarLivro());
         excluirButton.addActionListener(e -> excluirLivro());
         sairButton.addActionListener(e -> System.exit(0));
+
+        conectarBanco();
+    }
+
+    private void conectarBanco() {
+        try {
+            String url = "jdbc:mysql://localhost:3306/biblioteca";
+            String user = "root";
+            String password = "anjoeterno1820";
+            connection = DriverManager.getConnection(url, user, password);
+            consultaArea.setText("Conectado ao banco de dados.");
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Erro ao conectar ao banco: " + e.getMessage(), "Erro", JOptionPane.ERROR_MESSAGE);
+            System.exit(1);
+        }
     }
 
     private void incluirLivro() {
-        String autor = autorField.getText();
-        String genero = generoField.getText();
-        int anoDeLancamento = Integer.parseInt(anoDeLancamentoField.getText());
-        String codigoISBN = codigoISBNField.getText();
-        int quantidadeDeCopias = Integer.parseInt(quantidadeDeCopiasField.getText());
-        float valor = Float.parseFloat(valorField.getText());
-        String nome = nomeField.getText();
-        String prateleira = prateleiraField.getText();
-        int quantidadeDePaginas = Integer.parseInt(quantidadeDePaginasField.getText());
-        String edicao = edicaoField.getText();
+        try {
+            String query = "INSERT INTO livros (autor, genero, ano_de_lancamento, quantidade_de_copias, valor, nome, prateleira, quantidade_de_paginas, edicao) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            PreparedStatement stmt = connection.prepareStatement(query);
 
-        livros.add(new Biblioteca(autor, genero, anoDeLancamento, codigoISBN, quantidadeDeCopias, valor, nome, prateleira, quantidadeDePaginas, edicao));
-        consultaArea.setText("Livro incluído: " + nome);
+            stmt.setString(1, autorField.getText());
+            stmt.setString(2, generoField.getText());
+            stmt.setInt(3, Integer.parseInt(anoDeLancamentoField.getText()));
+            stmt.setInt(4, Integer.parseInt(quantidadeDeCopiasField.getText()));
+            stmt.setFloat(5, Float.parseFloat(valorField.getText()));
+            stmt.setString(6, nomeField.getText());
+            stmt.setString(7, prateleiraField.getText());
+            stmt.setInt(8, Integer.parseInt(quantidadeDePaginasField.getText()));
+            stmt.setString(9, edicaoField.getText());
 
-        limparCampos();
+            stmt.executeUpdate();
+            consultaArea.setText("Livro incluído com sucesso.");
+            limparCampos();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            consultaArea.setText("Erro ao incluir livro: " + e.getMessage());
+        }
     }
 
-    private void consultarLivro() {
-        StringBuilder sb = new StringBuilder("Livros cadastrados:\n");
-        for (Biblioteca livro : livros) {
-            sb.append("Nome: ").append(livro.getnome()).append("\n")
-              .append("Autor: ").append(livro.getAutor()).append("\n")
-              .append("Gênero: ").append(livro.getGenero()).append("\n")
-              .append("Ano de Lançamento: ").append(livro.getAnoDeLancamento()).append("\n")
-              .append("ISBN: ").append(livro.getCodigoISBN()).append("\n")
-              .append("Quantidade de Cópias: ").append(livro.getQuantidadeDeCopias()).append("\n")
-              .append("Valor: ").append(livro.getValor()).append("\n")
-              .append("Prateleira: ").append(livro.getPrateleira()).append("\n")
-              .append("Quantidade de Páginas: ").append(livro.getQuantidadeDePaginas()).append("\n")
-              .append("Edição: ").append(livro.getEdicao()).append("\n\n");
+    private void consultarLivroPorId() {
+    try {
+        
+        String idTexto = idConsultaField.getText().trim();
+        if (idTexto.isEmpty()) {
+            consultaArea.setText("Por favor, insira um ID para consulta.");
+            return;
         }
-        consultaArea.setText(sb.toString());
+
+        int id = Integer.parseInt(idTexto);
+
+        
+        System.out.println("Consultando livro com ID: " + id);
+
+        
+        String query = "SELECT * FROM livros WHERE id = ?";
+        PreparedStatement stmt = connection.prepareStatement(query);
+        stmt.setInt(1, id);
+
+        
+        ResultSet rs = stmt.executeQuery();
+
+        
+        if (rs.next()) {
+            StringBuilder sb = new StringBuilder("Livro Encontrado:\n");
+            sb.append("Nome: ").append(rs.getString("nome")).append("\n");
+            sb.append("Autor: ").append(rs.getString("autor")).append("\n");
+            sb.append("Gênero: ").append(rs.getString("genero")).append("\n");
+            sb.append("Ano de Lançamento: ").append(rs.getInt("ano_de_lancamento")).append("\n");
+            sb.append("Quantidade de Cópias: ").append(rs.getInt("quantidade_de_copias")).append("\n");
+            sb.append("Valor: ").append(rs.getFloat("valor")).append("\n");
+            sb.append("Prateleira: ").append(rs.getString("prateleira")).append("\n");
+            sb.append("Quantidade de Páginas: ").append(rs.getInt("quantidade_de_paginas")).append("\n");
+            sb.append("Edição: ").append(rs.getString("edicao")).append("\n");
+
+            consultaArea.setText(sb.toString());
+        } else {
+            consultaArea.setText("Nenhum livro encontrado com o ID fornecido.");
+        }
+    } catch (NumberFormatException e) {
+        consultaArea.setText("O ID deve ser um número válido.");
+        e.printStackTrace();
+    } catch (SQLException e) {
+        consultaArea.setText("Erro ao consultar livro: " + e.getMessage());
+        e.printStackTrace();
     }
+}
 
-    private void carregarLivroParaAlteracao() {
-        String codigoISBN = codigoISBNField.getText();
-        for (Biblioteca livro : livros) {
-            if (livro.getCodigoISBN().equals(codigoISBN)) {
-                autorField.setText(livro.getAutor());
-                generoField.setText(livro.getGenero());
-                anoDeLancamentoField.setText(String.valueOf(livro.getAnoDeLancamento()));
-                quantidadeDeCopiasField.setText(String.valueOf(livro.getQuantidadeDeCopias()));
-                valorField.setText(String.valueOf(livro.getValor()));
-                nomeField.setText(livro.getnome());
-                prateleiraField.setText(livro.getPrateleira());
-                quantidadeDePaginasField.setText(String.valueOf(livro.getQuantidadeDePaginas()));
-                edicaoField.setText(livro.getEdicao());
 
-                livroAtual = livro;
-                consultaArea.setText("Livro pronto para alteração.");
-                return;
-            }
+    private void alterarLivro() {
+         try {
+        String idTexto = idConsultaField.getText();
+        if (idTexto.isEmpty()) {
+            consultaArea.setText("Por favor, insira um ID para alterar.");
+            return;
         }
-        consultaArea.setText("Livro não encontrado.");
+
+        int id = Integer.parseInt(idTexto);
+        String query = "UPDATE livros SET autor = ?, genero = ?, ano_de_lancamento = ?, quantidade_de_copias = ?, valor = ?, nome = ?, prateleira = ?, quantidade_de_paginas = ?, edicao = ? WHERE id = ?";
+        PreparedStatement stmt = connection.prepareStatement(query);
+
+        stmt.setString(1, autorField.getText());
+        stmt.setString(2, generoField.getText());
+        stmt.setInt(3, Integer.parseInt(anoDeLancamentoField.getText()));
+        stmt.setInt(4, Integer.parseInt(quantidadeDeCopiasField.getText()));
+        stmt.setFloat(5, Float.parseFloat(valorField.getText()));
+        stmt.setString(6, nomeField.getText());
+        stmt.setString(7, prateleiraField.getText());
+        stmt.setInt(8, Integer.parseInt(quantidadeDePaginasField.getText()));
+        stmt.setString(9, edicaoField.getText());
+        stmt.setInt(10, id);
+
+        int rowsAffected = stmt.executeUpdate();
+        if (rowsAffected > 0) {
+            consultaArea.setText("Livro alterado com sucesso.");
+            limparCampos();
+        } else {
+            consultaArea.setText("Nenhum livro encontrado com o ID fornecido.");
+        }
+    } catch (NumberFormatException e) {
+        consultaArea.setText("O ID deve ser um número.");
+    } catch (SQLException e) {
+        e.printStackTrace();
+        consultaArea.setText("Erro ao alterar livro: " + e.getMessage());
+    }
     }
 
     private void excluirLivro() {
-        String codigoISBN = codigoISBNField.getText();
-        for (int i = 0; i < livros.size(); i++) {
-            if (livros.get(i).getCodigoISBN().equals(codigoISBN)) {
-                livros.remove(i);
-                consultaArea.setText("Livro excluído com sucesso.");
-                limparCampos();
-                return;
-            }
+         try {
+        String idTexto = idConsultaField.getText();
+        if (idTexto.isEmpty()) {
+            consultaArea.setText("Por favor, insira um ID para excluir.");
+            return;
         }
-        consultaArea.setText("Livro não encontrado.");
+
+        int id = Integer.parseInt(idTexto);
+        String query = "DELETE FROM livros WHERE id = ?";
+        PreparedStatement stmt = connection.prepareStatement(query);
+        stmt.setInt(1, id);
+
+        int rowsAffected = stmt.executeUpdate();
+        if (rowsAffected > 0) {
+            consultaArea.setText("Livro excluído com sucesso.");
+            limparCampos();
+        } else {
+            consultaArea.setText("Nenhum livro encontrado com o ID fornecido.");
+        }
+    } catch (NumberFormatException e) {
+        consultaArea.setText("O ID deve ser um número.");
+    } catch (SQLException e) {
+        e.printStackTrace();
+        consultaArea.setText("Erro ao excluir livro: " + e.getMessage());
+    }
     }
 
     private void limparCampos() {
         autorField.setText("");
         generoField.setText("");
         anoDeLancamentoField.setText("");
-        codigoISBNField.setText("");
         quantidadeDeCopiasField.setText("");
         valorField.setText("");
         nomeField.setText("");
